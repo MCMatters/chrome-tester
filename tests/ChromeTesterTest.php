@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace McMatters\ChromeTester\Tests;
 
@@ -15,6 +15,8 @@ use PHPUnit\Framework\TestCase;
 class ChromeTesterTest extends TestCase
 {
     /**
+     * @return void
+     *
      * @throws \PHPUnit\Framework\ExpectationFailedException
      * @throws \SebastianBergmann\RecursionContext\InvalidArgumentException
      * @throws \Symfony\Component\Process\Exception\LogicException

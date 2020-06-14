@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace McMatters\ChromeTester;
 
@@ -10,8 +10,10 @@ use Facebook\WebDriver\Remote\RemoteWebDriver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
+
+use function array_key_exists, dirname, strncasecmp, usleep;
+
 use const null, PHP_OS;
-use function array_merge, dirname, strncasecmp, usleep;
 
 /**
  * Class Browser
@@ -21,29 +23,39 @@ use function array_merge, dirname, strncasecmp, usleep;
 class Browser
 {
     /**
-     * @var Browser
+     * @var \McMatters\ChromeTester\Browser
      */
     protected static $instance;
 
     /**
-     * @var Process
+     * @var \Symfony\Component\Process\Process
      */
     protected static $process;
 
     /**
-     * @var RemoteWebDriver
+     * @var \Facebook\WebDriver\Remote\RemoteWebDriver
      */
     protected static $driver;
 
     /**
-     * @var string
+     * @var string|null
      */
-    protected static $chromeBinary = '';
+    protected static $chromeBinary;
 
     /**
      * @var int
      */
     protected static $attempts = 5;
+
+    /**
+     * @var int
+     */
+    protected static $sleep = 5000000;
+
+    /**
+     * @var string
+     */
+    protected static $chromeAddress = 'http://localhost:9515';
 
     /**
      * @return void
@@ -56,24 +68,24 @@ class Browser
     }
 
     /**
-     * @param array $arguments
+     * @param array $options
+     * @param array $chromeArguments
      *
      * @return static
-     * @throws \Symfony\Component\Process\Exception\RuntimeException
-     * @throws \Symfony\Component\Process\Exception\LogicException
-     * @throws Throwable
+     *
+     * @throws \Throwable
      */
-    public static function make(array $arguments = [])
+    public static function make(array $options = [], array $chromeArguments = [])
     {
         if (null === self::$instance) {
-            self::$instance = new static($arguments);
+            self::$instance = new static($options, $chromeArguments);
         }
 
         return self::$instance;
     }
 
     /**
-     * @return RemoteWebDriver
+     * @return \Facebook\WebDriver\Remote\RemoteWebDriver
      */
     public function getChromeDriver(): RemoteWebDriver
     {
@@ -83,41 +95,61 @@ class Browser
     /**
      * @param string $binary
      *
-     * @return Browser
+     * @return void
      */
-    public static function setChromeBinary(string $binary): Browser
+    public static function setChromeBinary(string $binary): void
     {
         self::$chromeBinary = $binary;
-
-        return self::$instance;
     }
 
     /**
      * @param int $attempts
      *
-     * @return Browser
+     * @return void
      */
-    public static function setAttempts(int $attempts): Browser
+    public static function setAttempts(int $attempts): void
     {
         self::$attempts = $attempts;
-
-        return self::$instance;
     }
 
     /**
      * Browser constructor.
      *
-     * @param array $arguments
+     * @param array $options
+     * @param array $chromeArguments
      *
-     * @throws \Symfony\Component\Process\Exception\LogicException
-     * @throws \Symfony\Component\Process\Exception\RuntimeException
-     * @throws Throwable
+     * @throws \Throwable
      */
-    protected function __construct(array $arguments = [])
+    protected function __construct(array $options = [], array $chromeArguments = [])
     {
+        self::setOptions($options);
         self::$process = new Process([self::getBinaryPath()], dirname(__DIR__));
-        self::$process->start();
-        self::$driver = self::createWebDriver($arguments);
+        self::$process->enableOutput()->start();
+        self::$driver = self::createWebDriver($chromeArguments);
+    }
+
+    /**
+     * @param array $options
+     *
+     * @return void
+     */
+    protected static function setOptions(array $options = []): void
+    {
+        if (array_key_exists('chromeBinary', $options)) {
+            self::$chromeBinary = $options['chromeBinary'];
+        }
+
+        if (array_key_exists('attempts', $options)) {
+            self::$attempts = $options['attempts'];
+        }
+
+        if (array_key_exists('sleep', $options)) {
+            self::$sleep = $options['sleep'];
+        }
+
+        if (array_key_exists('chromeAddress', $options)) {
+            self::$chromeAddress = $options['chromeAddress'];
+        }
     }
 
     /**
@@ -125,6 +157,10 @@ class Browser
      */
     protected static function getBinaryPath(): string
     {
+        if (null !== self::$chromeBinary) {
+            return self::$chromeBinary;
+        }
+
         if (PHP_OS === 'Darwin') {
             return dirname(__DIR__).'/bin/chromedriver-mac';
         }
@@ -137,23 +173,19 @@ class Browser
     /**
      * @param array $arguments
      *
-     * @return RemoteWebDriver
-     * @throws Throwable
+     * @return \Facebook\WebDriver\Remote\RemoteWebDriver
+     *
+     * @throws \Throwable
      */
     protected static function createWebDriver(array $arguments = []): RemoteWebDriver
     {
-        $arguments = array_merge(
-            $arguments,
-            [
-                '--disable-gpu',
-                '--headless',
-                '--no-sandbox',
-            ]
-        );
+        $arguments = $arguments ?? [
+            '--disable-gpu',
+            '--headless',
+            '--no-sandbox',
+        ];
 
-        $options = (new ChromeOptions())
-            ->addArguments($arguments)
-            ->setBinary(self::$chromeBinary);
+        $options = (new ChromeOptions())->addArguments($arguments);
 
         return self::attemptToConnectWebDriver($options);
     }
@@ -161,8 +193,9 @@ class Browser
     /**
      * @param $options
      *
-     * @return RemoteWebDriver
-     * @throws Throwable
+     * @return \Facebook\WebDriver\Remote\RemoteWebDriver
+     *
+     * @throws \Throwable
      */
     protected static function attemptToConnectWebDriver(
         ChromeOptions $options
@@ -172,7 +205,7 @@ class Browser
         do {
             try {
                 return RemoteWebDriver::create(
-                    'http://localhost:9515',
+                    self::$chromeAddress,
                     DesiredCapabilities::chrome()->setCapability(
                         ChromeOptions::CAPABILITY,
                         $options
@@ -183,7 +216,7 @@ class Browser
                     throw $e;
                 }
 
-                usleep(50000);
+                usleep(self::$sleep);
 
                 $attempts--;
             }

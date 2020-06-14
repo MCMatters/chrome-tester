@@ -13,7 +13,7 @@ composer require mcmatters/chrome-tester --dev
 ```php
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 use Facebook\WebDriver\WebDriverBy;
 use McMatters\ChromeTester\Browser;
