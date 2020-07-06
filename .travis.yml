@@ -6,6 +6,7 @@ php:
   - '7.2'
 
 addons:
+  chrome: stable
   code_climate:
     repo_token: e2bbac49e3a492167512473b51de8a6526e10dba6705c29139b209b688a2b28c
 
